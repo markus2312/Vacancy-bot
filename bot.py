@@ -7,7 +7,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 scope = ["https://spreadsheets.google.com/feeds",'https://www.googleapis.com/auth/drive']
 creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
 client = gspread.authorize(creds)
-sheet = client.open("Название твоей таблицы").sheet1  # замени на точное название
+sheet = client.open("Передовик вакансии БОТ").sheet1  # замени на точное название
 
 def get_data():
     return sheet.get_all_records()
@@ -42,7 +42,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Не нашёл вакансию по вашему запросу. Попробуйте написать её полнее.")
 
 # Запуск бота
-app = ApplicationBuilder().token("ТВОЙ_ТОКЕН_БОТА").build()
+app = ApplicationBuilder().token("7868075757:AAER7ENuM0L6WT_W5ZB0iRrVRUw8WeijbOo").build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("jobs", jobs))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
