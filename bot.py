@@ -5,6 +5,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 import json
 import os
 import asyncio
+import difflib
 
 # Подключение к Google Sheets
 scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/drive']
@@ -27,7 +28,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=reply_markup
     )
 
-# Команда /jobs
+# Команда /jobs и кнопка
 async def jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = get_data()
     lines = []
@@ -36,42 +37,58 @@ async def jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
             for line in row['Вакансия'].splitlines():
                 lines.append(f"• {line.strip()}")
     text = "\n".join(lines)
-    await update.message.reply_text("Список актуальных вакансий:\n\n" + text)
-    await asyncio.sleep(1)
-    await update.message.reply_text("Какая вакансия интересует?")
 
-# Поиск вакансий по сообщению
+    # Определим, откуда пришёл запрос (команда или кнопка)
+    if update.message:
+        await update.message.reply_text("Список актуальных вакансий:\n\n" + text)
+        await asyncio.sleep(1)
+        await update.message.reply_text("Какая вакансия интересует?")
+    elif update.callback_query:
+        await update.callback_query.message.reply_text("Список актуальных вакансий:\n\n" + text)
+        await asyncio.sleep(1)
+        await update.callback_query.message.reply_text("Какая вакансия интересует?")
+
+# Обработка кнопки
+async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if query.data == "find_jobs":
+        await jobs(update, context)
+
+# Ответ на текст
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.lower()
     data = get_data()
 
+    all_titles = [row['Вакансия'] for row in data]
+    matches = []
+
     for row in data:
-        вакансии = row['Вакансия'].lower().splitlines()
-        for вак in вакансии:
-            if text in вак:
-                response = f"""
+        for line in row['Вакансия'].splitlines():
+            if text in line.lower():
+                matches.append(row)
+                break
+            elif difflib.get_close_matches(text, [line.lower()], cutoff=0.6):
+                matches.append(row)
+                break
+
+    if matches:
+        for row in matches:
+            response = f"""
 🔧 *{row['Вакансия']}*
 📈 Часовая ставка: {row['Часовая ставка']}
 🕐 Вахта 30/30: {row['Вахта по 12 часов (30/30)']}
 🕑 Вахта 60/30: {row['Вахта по 11 ч (60/30)']}
 📌 Статус: {row.get('СТАТУС', 'не указан')}
 """
-                await update.message.reply_markdown(response)
-                return
-
-    await update.message.reply_text("Не нашёл вакансию по вашему запросу. Попробуйте написать её полнее.")
-
-# Обработка нажатия кнопки
-async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    if query.data == "find_jobs":
-        await jobs(update, context)
+            await update.message.reply_markdown(response)
+    else:
+        await update.message.reply_text("Не нашёл вакансию по вашему запросу. Попробуйте написать её полнее.")
 
 # Запуск бота
 app = ApplicationBuilder().token("7868075757:AAER7ENuM0L6WT_W5ZB0iRrVRUw8WeijbOo").build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("jobs", jobs))
-app.add_handler(CallbackQueryHandler(callback_query_handler))
+app.add_handler(CallbackQueryHandler(handle_callback))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 app.run_polling()
