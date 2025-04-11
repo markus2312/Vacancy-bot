@@ -74,6 +74,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if matches:
         for row in matches:
+            # Добавляем описание из столбца F
+            description = row.get('Описание вакансии', '').strip()
             response = f"""
 🔧 *{row['Вакансия']}*
 
@@ -87,6 +89,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 {row['Вахта по 11 ч (60/30)']}
 
 📌 Статус: {row.get('СТАТУС', 'не указан')}
+
+📃 Описание вакансии:
+{description}
 """
             await update.message.reply_markdown(response)
     else:
