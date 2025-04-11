@@ -54,9 +54,31 @@ async def start_application(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    # Отправляем сообщение и начинаем диалог
-    await query.edit_message_text("Для отклика на вакансию введите ваше ФИО:")
-    return GET_NAME
+    # Получаем название вакансии, на которую откликаются
+    vacancy_name = context.user_data.get('vacancy_name', '')
+    if vacancy_name:
+        # Отправляем сообщение с данными о вакансии
+        keyboard = [
+            [InlineKeyboardButton("ОТКЛИКНУТЬСЯ", callback_data="start_application")],
+            [InlineKeyboardButton("НАЗАД", callback_data="back")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        # Получаем описание вакансии из таблицы
+        data = get_data()
+        vacancy_description = ""
+        for row in data:
+            if row['Вакансия'] == vacancy_name:
+                vacancy_description = row.get('Описание', '')
+
+        # Формируем текст с деталями вакансии
+        vacancy_details = f"🔧 *{vacancy_name}*\n\n📃 Описание вакансии:\n\n{vacancy_description}"
+
+        await query.edit_message_text(vacancy_details, reply_markup=reply_markup)
+    else:
+        await query.edit_message_text("Не удалось найти вакансию, попробуйте снова.")
+
+    return GET_NAME  # Начинаем сбор данных
 
 # Сбор ФИО
 async def get_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -111,14 +133,21 @@ async def job_details(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    # Пример вакансии с кнопками
+    # Получаем вакансию, на которую откликается пользователь
+    vacancy_name = "Пример вакансии"  # Например, эта вакансия, нужно получить её из данных
+    context.user_data['vacancy_name'] = vacancy_name
+
+    # Добавляем кнопки
     keyboard = [
         [InlineKeyboardButton("ОТКЛИКНУТЬСЯ", callback_data="start_application")],
         [InlineKeyboardButton("НАЗАД", callback_data="back")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await query.edit_message_text("Детали вакансии:\n\nОписание вакансии...", reply_markup=reply_markup)
+    # Формируем текст с вакансией
+    vacancy_details = f"🔧 *{vacancy_name}*\n\nОписание вакансии: ..."
+
+    await query.edit_message_text(vacancy_details, reply_markup=reply_markup)
 
 # ConversationHandler
 conversation_handler = ConversationHandler(
