@@ -1,4 +1,4 @@
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
@@ -20,7 +20,19 @@ def get_data():
 
 # Команда /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Привет! Я помогу вам подобрать вакансию. Напишите название профессии или используйте команду /jobs.")
+    # Создаем кнопку
+    keyboard = [
+        [InlineKeyboardButton("Найти вакансии", callback_data="find_jobs")]  # Кнопка "Найти вакансии"
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    # Отправляем приветственное сообщение
+    await update.message.reply_text(
+        "Привет! Я — твой персональный помощник по подбору вакансий.\n\n"
+        "Здесь ты сможешь быстро найти актуальные вакансии, узнать подробности и выбрать подходящее предложение.\n\n"
+        "Нажми на кнопку 👇 и начни свой поиск!",
+        reply_markup=reply_markup
+    )
 
 # Команда /jobs
 async def jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
