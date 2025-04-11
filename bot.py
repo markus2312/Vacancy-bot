@@ -121,6 +121,8 @@ async def handle_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("АКТУАЛЬНЫЕ ВАКАНСИИ", callback_data="find_jobs")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    # Редактируем сообщение, возвращая пользователя в начальное состояние
     await query.message.edit_text(
         "Я помогу вам подобрать вакансию. Напишите название профессии или посмотрите список открытых вакансий",
         reply_markup=reply_markup
