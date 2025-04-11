@@ -87,6 +87,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data = get_data()
         matches = []
 
+        # Ищем вакансии, соответствующие запросу пользователя
         for row in data:
             for line in row['Вакансия'].splitlines():
                 if text in line.lower() or difflib.get_close_matches(text, [line.lower()], cutoff=0.6):
