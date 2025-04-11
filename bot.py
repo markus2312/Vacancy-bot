@@ -136,7 +136,7 @@ async def back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return CHOOSING_VACANCY
 
 # Запуск бота
-app = ApplicationBuilder().token(os.environ['TELEGRAM_BOT_TOKEN']).build()
+app = ApplicationBuilder().token(os.environ["BOT_TOKEN"]).build()
 
 conv_handler = ConversationHandler(
     entry_points=[CommandHandler("start", start)],
