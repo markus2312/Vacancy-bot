@@ -76,9 +76,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for row in matches:
             response = f"""
 🔧 *{row['Вакансия']}*
-📈 Часовая ставка:\n{row['Часовая ставка']}
-🕐 Вахта 30/30 по 12ч:\n{row['Вахта по 12 часов (30/30)']}
-🕑 Вахта 60/30 по 11ч:\n{row['Вахта по 11 ч (60/30)']}
+
+📈 Часовая ставка:
+{row['Часовая ставка']}
+
+🕐 Вахта 30/30 по 12ч:
+{row['Вахта по 12 часов (30/30)']}
+
+🕑 Вахта 60/30 по 11ч:
+{row['Вахта по 11 ч (60/30)']}
+
 📌 Статус: {row.get('СТАТУС', 'не указан')}
 """
             await update.message.reply_markdown(response)
