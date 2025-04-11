@@ -97,7 +97,6 @@ async def handle_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
 app = ApplicationBuilder().token("7868075757:AAER7ENuM0L6WT_W5ZB0iRrVRUw8WeijbOo").build()
 
 # Сначала добавляем обработчики для кнопок (важно, чтобы обработка кнопок была первой)
-app.add_handler(CallbackQueryHandler(handle_callback))
 app.add_handler(CallbackQueryHandler(handle_apply, pattern="apply_"))
 app.add_handler(CallbackQueryHandler(back, pattern="back"))
 
