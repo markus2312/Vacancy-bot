@@ -71,6 +71,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Обработка текстового ввода (поиск вакансий)
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Если мы в процессе ввода ФИО или телефона, то не обрабатываем как поиск вакансий
+    if 'state' in context.user_data and context.user_data['state'] in [STATE_WAITING_FOR_FIO, STATE_WAITING_FOR_PHONE]:
+        return
+
     text = update.message.text.lower()
     data = get_data()
     matches = []
