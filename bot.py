@@ -115,11 +115,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def back_to_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    # Повторно отправляем начальное сообщение с кнопкой
+
+    # Создаем клавиатуру с кнопкой для поиска вакансий
     keyboard = [
         [InlineKeyboardButton("АКТУАЛЬНЫЕ ВАКАНСИИ", callback_data="find_jobs")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
+
+    # Редактируем текущее сообщение, возвращая его в начальное состояние
     await query.message.edit_text(
         "Я помогу вам подобрать вакансию. Напишите название профессии или посмотрите список открытых вакансий",
         reply_markup=reply_markup
