@@ -1,4 +1,4 @@
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
@@ -98,11 +98,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 📌 Статус: {row.get('СТАТУС', 'не указан')}{description_text}
 """
-            
-            # Создаем кнопки
+
+            # Добавляем кнопки "ОТКЛИКНУТЬСЯ" и "НАЗАД"
             keyboard = [
                 [InlineKeyboardButton("ОТКЛИКНУТЬСЯ", callback_data=f"apply_{row['Вакансия']}"),
-                 InlineKeyboardButton("НАЗАД", callback_data="back_to_start")]
+                 InlineKeyboardButton("НАЗАД", callback_data="back")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -111,28 +111,35 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("Не нашёл вакансию по вашему запросу. Попробуйте написать её полнее.")
 
-# Обработчик кнопки "НАЗАД" — возвращаем к начальному сообщению
-async def back_to_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# Обработка кнопки НАЗАД
+async def handle_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    # Создаем клавиатуру с кнопкой для поиска вакансий
+    # Отправляем сообщение с кнопкой "АКТУАЛЬНЫЕ ВАКАНСИИ"
     keyboard = [
         [InlineKeyboardButton("АКТУАЛЬНЫЕ ВАКАНСИИ", callback_data="find_jobs")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-
-    # Редактируем текущее сообщение, возвращая его в начальное состояние
     await query.message.edit_text(
         "Я помогу вам подобрать вакансию. Напишите название профессии или посмотрите список открытых вакансий",
         reply_markup=reply_markup
     )
+
+# Обработка кнопки отклика
+async def handle_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    vacancy = query.data.split("_", 1)[1]  # Получаем название вакансии из callback_data
+    await query.answer()
+    await query.message.edit_text(f"Вы откликнулись на вакансию: {vacancy}\nВведите ваше ФИО:")
 
 # Запуск бота
 app = ApplicationBuilder().token("7868075757:AAER7ENuM0L6WT_W5ZB0iRrVRUw8WeijbOo").build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("jobs", jobs))
 app.add_handler(CallbackQueryHandler(handle_callback))
-app.add_handler(CallbackQueryHandler(back_to_start, pattern="back_to_start"))
+app.add_handler(CallbackQueryHandler(handle_back, pattern="back"))
+app.add_handler(CallbackQueryHandler(handle_apply, pattern="apply_"))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
 app.run_polling()
