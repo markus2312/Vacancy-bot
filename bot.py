@@ -4,6 +4,7 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import json
 import os
+import asyncio  # Для использования асинхронной задержки
 
 # Подключение к Google Sheets
 scope = ["https://spreadsheets.google.com/feeds",'https://www.googleapis.com/auth/drive']
@@ -32,7 +33,14 @@ async def jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 lines.append(f"• {line.strip()}")  # Добавляем каждую строку с маркером
     text = "\n".join(lines)  # Объединяем все вакансии в одну строку
 
-    await update.message.reply_text("Список актуальных вакансий:\n" + text)
+    # Отправляем список вакансий с отступом
+    await update.message.reply_text("Список актуальных вакансий:\n\n" + text)
+    
+    # Задержка в 1 секунду перед следующим сообщением
+    await asyncio.sleep(1)
+    
+    # Следующее сообщение
+    await update.message.reply_text("Какая вакансия интересует?")
 
 # Ответ на сообщения
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
