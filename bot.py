@@ -1,10 +1,9 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, ConversationHandler, filters, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes, ConversationHandler
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import json
 import os
-import asyncio
 import difflib
 import re
 from datetime import datetime
@@ -14,19 +13,10 @@ scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/au
 creds_dict = json.loads(os.environ['GOOGLE_CREDENTIALS'])
 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
+sheet = client.open("Передовик вакансии БОТ").sheet1
 
-# Получение данных из таблицы
 def get_data():
-    sheet = client.open("Передовик вакансии БОТ").sheet1
     return sheet.get_all_records()
-
-def save_application_to_sheet(name, phone, vacancy, username):
-    sheet = client.open_by_key("10TcAZPunK079FBN1gNQIU4XmInMEQ8Qz4CWeA6oDGvI")
-    worksheet = sheet.worksheet("bot otkliki")
-
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    new_row = [now, name, phone, vacancy, f"@{username}" if username else "без username"]
-    worksheet.append_row(new_row, value_input_option="USER_ENTERED")
 
 # Состояния для пользователя
 STATE_WAITING_FOR_FIO = 1
@@ -59,11 +49,9 @@ async def jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if update.message:
         await update.message.reply_text("Список актуальных вакансий:\n\n" + text)
-        await asyncio.sleep(1)
         await update.message.reply_text("Какая вакансия интересует?")
     elif update.callback_query:
         await update.callback_query.message.reply_text("Список актуальных вакансий:\n\n" + text)
-        await asyncio.sleep(1)
         await update.callback_query.message.reply_text("Какая вакансия интересует?")
 
 # Обработка кнопки "АКТУАЛЬНЫЕ ВАКАНСИИ"
@@ -73,9 +61,50 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.data == "find_jobs":
         await jobs(update, context)
 
+# Обработка текстового ввода
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.lower()
+    data = get_data()
+    matches = []
+
+    for row in data:
+        for line in row['Вакансия'].splitlines():
+            if text in line.lower() or difflib.get_close_matches(text, [line.lower()], cutoff=0.6):
+                matches.append(row)
+                break
+
+    if matches:
+        for i, row in enumerate(matches):
+            description = row.get('Описание', '').strip()
+            description_text = f"\n\n📃 Описание вакансии:\n\n{description}" if description else ""
+
+            response = f"""
+🔧 *{row['Вакансия']}*
+
+📈 Часовая ставка:
+{row['Часовая ставка']}
+
+🕐 Вахта 30/30 по 12ч:
+{row['Вахта по 12 часов (30/30)']}
+
+🕑 Вахта 60/30 по 11ч:
+{row['Вахта по 11 ч (60/30)']}
+
+📌 Статус: {row.get('СТАТУС', 'не указан')}{description_text}
+"""
+
+            keyboard = [
+                [InlineKeyboardButton("ОТКЛИКНУТЬСЯ", callback_data=f"apply_{i}")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_markdown(response, reply_markup=reply_markup)
+    else:
+        await update.message.reply_text("Не нашёл вакансию по вашему запросу. Попробуйте написать её полнее.")
+
 # Обработка кнопки "ОТКЛИКНУТЬСЯ"
 async def handle_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    await query.answer()
     index = int(query.data.split("_", 1)[1])
     data = get_data()
 
@@ -87,7 +116,6 @@ async def handle_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     vacancy = row['Вакансия']
     context.user_data['vacancy'] = vacancy  # Сохраняем вакансию на которую откликнулись
 
-    await query.answer()
     await query.message.edit_text(f"Вы откликнулись на вакансию: {vacancy}\n\nПожалуйста, введите ваше ФИО:")
 
     # Меняем состояние пользователя на ожидающий ФИО
@@ -129,6 +157,15 @@ async def handle_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Завершаем процесс
     return ConversationHandler.END
 
+# Сохранение данных в Google Sheets
+def save_application_to_sheet(name, phone, vacancy, username):
+    sheet = client.open_by_key("10TcAZPunK079FBN1gNQIU4XmInMEQ8Qz4CWeA6oDGvI")
+    worksheet = sheet.worksheet("bot otkliki")
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    new_row = [now, name, phone, vacancy, f"@{username}" if username else "без username"]
+    worksheet.append_row(new_row, value_input_option="USER_ENTERED")
+
 # Запуск бота с использованием ConversationHandler
 conversation_handler = ConversationHandler(
     entry_points=[CallbackQueryHandler(handle_apply, pattern=r"apply_\d+")],
@@ -146,6 +183,7 @@ app = ApplicationBuilder().token(os.environ["BOT_TOKEN"]).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("jobs", jobs))
 app.add_handler(CallbackQueryHandler(handle_callback, pattern="find_jobs"))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 app.add_handler(conversation_handler)
 
 app.run_polling()
