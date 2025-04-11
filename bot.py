@@ -147,7 +147,7 @@ async def handle_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Не удалось найти вакансию. Попробуйте откликнуться заново.")
 
 # Запуск бота
-app = ApplicationBuilder().token("YOUR_BOT_TOKEN").build()
+app = ApplicationBuilder().token("7868075757:AAER7ENuM0L6WT_W5ZB0iRrVRUw8WeijbOo").build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("jobs", jobs))
 app.add_handler(CommandHandler("back", back))
