@@ -1,5 +1,5 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, ConversationHandler, filters, ContextTypes
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import json
@@ -28,10 +28,13 @@ def save_application_to_sheet(name, phone, vacancy, username):
     new_row = [now, name, phone, vacancy, f"@{username}" if username else "без username"]
     worksheet.append_row(new_row, value_input_option="USER_ENTERED")
 
-# Состояния для каждого пользователя
+# Состояния для пользователя
 STATE_WAITING_FOR_FIO = 1
 STATE_WAITING_FOR_PHONE = 2
 STATE_IDLE = 0
+
+# Этапы для ConversationHandler
+FIO, PHONE = range(1, 3)
 
 # Команда /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -70,64 +73,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.data == "find_jobs":
         await jobs(update, context)
 
-# Обработка текстового ввода (поиск вакансий)
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Если пользователь в процессе ввода ФИО или телефона, не выполняем поиск
-    if 'state' in context.user_data and context.user_data['state'] in [STATE_WAITING_FOR_FIO, STATE_WAITING_FOR_PHONE]:
-        return
-
-    text = update.message.text.lower()
-    data = get_data()
-    matches = []
-
-    for row in data:
-        for line in row['Вакансия'].splitlines():
-            if text in line.lower() or difflib.get_close_matches(text, [line.lower()], cutoff=0.6):
-                matches.append(row)
-                break
-
-    if matches:
-        context.user_data['vacancies'] = matches  # Сохраняем найденные вакансии
-        for i, row in enumerate(matches):
-            description = row.get('Описание', '').strip()
-            description_text = f"\n\n📃 Описание вакансии:\n\n{description}" if description else ""
-
-            response = f"""
-🔧 *{row['Вакансия']}*
-
-📈 Часовая ставка:
-{row['Часовая ставка']}
-
-🕐 Вахта 30/30 по 12ч:
-{row['Вахта по 12 часов (30/30)']}
-
-🕑 Вахта 60/30 по 11ч:
-{row['Вахта по 11 ч (60/30)']}
-
-📌 Статус: {row.get('СТАТУС', 'не указан')}{description_text}
-"""
-
-            keyboard = [
-                [InlineKeyboardButton("ОТКЛИКНУТЬСЯ", callback_data=f"apply_{i}"),
-                 InlineKeyboardButton("НАЗАД", callback_data="back")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            await update.message.reply_markdown(response, reply_markup=reply_markup)
-    else:
-        await update.message.reply_text("Не нашёл вакансию по вашему запросу. Попробуйте написать её полнее.")
-
-# Обработка кнопки "НАЗАД"
-async def back(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.callback_query.answer()
-    keyboard = [
-        [InlineKeyboardButton("АКТУАЛЬНЫЕ ВАКАНСИИ", callback_data="find_jobs")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.callback_query.message.reply_text(
-        "Я помогу вам подобрать вакансию. Напишите название профессии или посмотрите список открытых вакансий",
-        reply_markup=reply_markup
-    )
-
 # Обработка кнопки "ОТКЛИКНУТЬСЯ"
 async def handle_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -146,35 +91,29 @@ async def handle_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.message.edit_text(f"Вы откликнулись на вакансию: {vacancy}\n\nПожалуйста, введите ваше ФИО:")
 
     # Меняем состояние пользователя на ожидающий ФИО
-    context.user_data['state'] = STATE_WAITING_FOR_FIO
+    return FIO
 
 # Обработка ввода ФИО
 async def handle_fio(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if context.user_data.get('state') != STATE_WAITING_FOR_FIO:
-        return
-
     fio = update.message.text.strip()
 
     if not re.match(r"^[А-Яа-яЁё\s-]+$", fio):
         await update.message.reply_text("Неверное ФИО. Пожалуйста, введите ФИО только с буквами, пробелами и дефисами.")
-        return
+        return FIO
 
     context.user_data['fio'] = fio
     await update.message.reply_text("Теперь, пожалуйста, введите ваш номер телефона:")
 
-    # Меняем состояние на ожидание номера телефона
-    context.user_data['state'] = STATE_WAITING_FOR_PHONE
+    # Переходим к следующему шагу
+    return PHONE
 
 # Обработка ввода номера телефона
 async def handle_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if context.user_data.get('state') != STATE_WAITING_FOR_PHONE:
-        return
-
     phone = update.message.text.strip()
 
     if not re.match(r"^[\d+\(\)\- ]+$", phone):
         await update.message.reply_text("Неверный номер телефона. Пожалуйста, введите номер с цифрами, знаками +, -, (), пробелами.")
-        return
+        return PHONE
 
     context.user_data['phone'] = phone
     username = update.message.from_user.username
@@ -187,8 +126,18 @@ async def handle_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                     f"Телефон: {context.user_data['phone']}\n\n"
                                     "Спасибо за отклик!")
 
-    # Завершаем процесс, сбрасываем состояние
-    context.user_data['state'] = STATE_IDLE
+    # Завершаем процесс
+    return ConversationHandler.END
+
+# Запуск бота с использованием ConversationHandler
+conversation_handler = ConversationHandler(
+    entry_points=[CallbackQueryHandler(handle_apply, pattern=r"apply_\d+")],
+    states={
+        FIO: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_fio)],
+        PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_phone)],
+    },
+    fallbacks=[]
+)
 
 # Запуск бота
 app = ApplicationBuilder().token(os.environ["BOT_TOKEN"]).build()
@@ -197,10 +146,6 @@ app = ApplicationBuilder().token(os.environ["BOT_TOKEN"]).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("jobs", jobs))
 app.add_handler(CallbackQueryHandler(handle_callback, pattern="find_jobs"))
-app.add_handler(CallbackQueryHandler(handle_apply, pattern=r"apply_\d+"))
-app.add_handler(CallbackQueryHandler(back, pattern="back"))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_fio))  # Для ФИО
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_phone))  # Для телефона
+app.add_handler(conversation_handler)
 
 app.run_polling()
