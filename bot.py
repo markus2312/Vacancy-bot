@@ -1,18 +1,17 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (ApplicationBuilder, CommandHandler, MessageHandler,
-                          CallbackQueryHandler, ContextTypes, ConversationHandler, filters)
+                          CallbackQueryHandler, ConversationHandler, ContextTypes, filters)
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import json
 import os
 import asyncio
 import difflib
-import re
 
-# Этапы ConversationHandler
-ASK_NAME, ASK_PHONE = range(2)
+# States for conversation
+CHOOSING_VACANCY, ASK_NAME, ASK_PHONE = range(3)
 
-# Подключение к Google Sheets
+# Google Sheets connection
 scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/drive']
 creds_dict = json.loads(os.environ['GOOGLE_CREDENTIALS'])
 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
@@ -22,37 +21,36 @@ sheet = client.open("Передовик вакансии БОТ").sheet1
 def get_data():
     return sheet.get_all_records()
 
-user_data_temp = {}
-
+# /start command
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("АКТУАЛЬНЫЕ ВАКАНСИИ", callback_data="find_jobs")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
         "Я помогу вам подобрать вакансию. Напишите название профессии или посмотрите список открытых вакансий",
-        reply_markup=reply_markup)
+        reply_markup=reply_markup
+    )
+    return CHOOSING_VACANCY
 
+# Jobs list
 async def jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = get_data()
-    lines = [f"\u2022 {line.strip()}" for row in data if row.get('СТАТУС', '').strip().upper() == 'НАБИРАЕМ'
-             for line in row['Вакансия'].splitlines()]
+    lines = []
+    for row in data:
+        if row.get('СТАТУС', '').strip().upper() == 'НАБИРАЕМ':
+            for line in row['Вакансия'].splitlines():
+                lines.append(f"• {line.strip()}")
     text = "\n".join(lines)
 
     if update.message:
         await update.message.reply_text("Список актуальных вакансий:\n\n" + text)
-        await asyncio.sleep(1)
-        await update.message.reply_text("Какая вакансия интересует?")
     elif update.callback_query:
         await update.callback_query.message.reply_text("Список актуальных вакансий:\n\n" + text)
-        await asyncio.sleep(1)
-        await update.callback_query.message.reply_text("Какая вакансия интересует?")
+    await asyncio.sleep(1)
+    await update.effective_message.reply_text("Какая вакансия интересует?")
+    return CHOOSING_VACANCY
 
-async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    if query.data == "find_jobs":
-        await jobs(update, context)
-
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# Обработка текстового ввода с названием вакансии
+async def handle_vacancy_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.lower()
     data = get_data()
     matches = []
@@ -64,97 +62,96 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 break
 
     if matches:
+        context.user_data['vacancies'] = matches
         for i, row in enumerate(matches):
             description = row.get('Описание', '').strip()
-            description_text = f"\n\n\ud83d\udcc3 Описание вакансии:\n\n{description}" if description else ""
+            description_text = f"\n\n📃 Описание вакансии:\n\n{description}" if description else ""
 
             response = f"""
-\ud83d\udd27 *{row['Вакансия']}*
+🔧 *{row['Вакансия']}*
 
-\ud83d\udcc8 Часовая ставка:
+📈 Часовая ставка:
 {row['Часовая ставка']}
 
-\ud83d\udd50 Вахта 30/30 по 12ч:
+🕐 Вахта 30/30 по 12ч:
 {row['Вахта по 12 часов (30/30)']}
 
-\ud83d\udd51 Вахта 60/30 по 11ч:
+🕑 Вахта 60/30 по 11ч:
 {row['Вахта по 11 ч (60/30)']}
 
-\ud83d\udccc Статус: {row.get('СТАТУС', 'не указан')}{description_text}
+📌 Статус: {row.get('СТАТУС', 'не указан')}{description_text}
 """
-            keyboard = [[InlineKeyboardButton("ОТКЛИКНУТЬСЯ", callback_data=f"apply_{i}"),
-                         InlineKeyboardButton("НАЗАД", callback_data="back")]]
+            keyboard = [[
+                InlineKeyboardButton("ОТКЛИКНУТЬСЯ", callback_data=f"apply_{i}"),
+                InlineKeyboardButton("НАЗАД", callback_data="back")
+            ]]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await update.message.reply_markdown(response, reply_markup=reply_markup)
+            await update.message.reply_text(response, reply_markup=reply_markup, parse_mode='Markdown')
     else:
         await update.message.reply_text("Не нашёл вакансию по вашему запросу. Попробуйте написать её полнее.")
+    return CHOOSING_VACANCY
 
+# Обработка кнопки "ОТКЛИКНУТЬСЯ"
+async def handle_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    index = int(query.data.split("_")[1])
+    vacancies = context.user_data.get('vacancies', [])
+
+    if index >= len(vacancies):
+        await query.answer("Не удалось найти вакансию. Попробуйте снова.")
+        return CHOOSING_VACANCY
+
+    vacancy = vacancies[index]
+    context.user_data['selected_vacancy'] = vacancy.get("Вакансия", "Неизвестно")
+    await query.answer()
+    await query.message.reply_text("Вы откликнулись на вакансию. Пожалуйста, введите ваше ФИО:")
+    return ASK_NAME
+
+# Обработка ввода ФИО
+async def ask_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data['name'] = update.message.text
+    await update.message.reply_text("Теперь введите ваш номер телефона:")
+    return ASK_PHONE
+
+# Обработка ввода телефона
+async def ask_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data['phone'] = update.message.text
+
+    name = context.user_data.get('name')
+    phone = context.user_data.get('phone')
+    vacancy = context.user_data.get('selected_vacancy')
+
+    await update.message.reply_text(f"Спасибо! Вы откликнулись на вакансию: {vacancy}\n\nФИО: {name}\nТелефон: {phone}")
+    return ConversationHandler.END
+
+# Обработка кнопки "НАЗАД"
 async def back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.callback_query.answer()
     keyboard = [[InlineKeyboardButton("АКТУАЛЬНЫЕ ВАКАНСИИ", callback_data="find_jobs")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.callback_query.message.reply_text(
         "Я помогу вам подобрать вакансию. Напишите название профессии или посмотрите список открытых вакансий",
-        reply_markup=reply_markup)
+        reply_markup=reply_markup
+    )
+    return CHOOSING_VACANCY
 
-async def handle_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    index = int(query.data.split("_", 1)[1])
-    context.user_data['vacancy_index'] = index
-    await query.answer()
-    await query.message.edit_text("Пожалуйста, введите ваше ФИО:")
-    return ASK_NAME
-
-async def ask_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    name = update.message.text.strip()
-    if not re.fullmatch(r"[A-Za-zА-Яа-яЁё\-\s]+", name):
-        await update.message.reply_text("Пожалуйста, введите корректное ФИО (только буквы и дефис).")
-        return ASK_NAME
-    context.user_data['full_name'] = name
-    await update.message.reply_text("Теперь укажите ваш контактный номер телефона:")
-    return ASK_PHONE
-
-async def ask_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    phone = update.message.text.strip()
-    if not re.fullmatch(r"[+\d()\s-]+", phone):
-        await update.message.reply_text("Пожалуйста, введите корректный номер телефона (только цифры, +, (), -).")
-        return ASK_PHONE
-
-    context.user_data['phone'] = phone
-    username = update.message.from_user.username or "Без username"
-
-    vacancy_index = context.user_data.get('vacancy_index')
-    data = get_data()
-    if vacancy_index >= len(data):
-        await update.message.reply_text("Ошибка: вакансия не найдена.")
-        return ConversationHandler.END
-
-    vacancy = data[vacancy_index]['Вакансия']
-    full_name = context.user_data['full_name']
-
-    await update.message.reply_text(f"Спасибо! Вы откликнулись на вакансию: {vacancy}\n\n"
-                                    f"ФИО: {full_name}\n"
-                                    f"Телефон: {phone}\n"
-                                    f"Username: @{username}")
-    return ConversationHandler.END
-
-# Запуск
-app = ApplicationBuilder().token(os.environ["BOT_TOKEN"]).build()
+# Запуск бота
+app = ApplicationBuilder().token(os.environ['TELEGRAM_BOT_TOKEN']).build()
 
 conv_handler = ConversationHandler(
-    entry_points=[CallbackQueryHandler(handle_apply, pattern=r"apply_\\d+")],
+    entry_points=[CommandHandler("start", start)],
     states={
+        CHOOSING_VACANCY: [
+            CallbackQueryHandler(jobs, pattern="find_jobs"),
+            CallbackQueryHandler(handle_apply, pattern=r"apply_\\d+"),
+            CallbackQueryHandler(back, pattern="back"),
+            MessageHandler(filters.TEXT & ~filters.COMMAND, handle_vacancy_query),
+        ],
         ASK_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_name)],
-        ASK_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_phone)],
+        ASK_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_phone)]
     },
     fallbacks=[]
 )
 
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("jobs", jobs))
 app.add_handler(conv_handler)
-app.add_handler(CallbackQueryHandler(handle_callback, pattern="find_jobs"))
-app.add_handler(CallbackQueryHandler(back, pattern="back"))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
 app.run_polling()
