@@ -6,6 +6,7 @@ import json
 import os
 import asyncio
 import difflib
+import re
 from datetime import datetime
 
 # Подключение к Google Sheets
@@ -64,7 +65,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.data == "find_jobs":
         await jobs(update, context)
 
-# Обработка текстового ввода
+# Обработка текстового ввода (поиск вакансий)
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.lower()
     data = get_data()
@@ -77,6 +78,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 break
 
     if matches:
+        context.user_data['vacancies'] = matches  # Сохраняем найденные вакансии
         for i, row in enumerate(matches):
             description = row.get('Описание', '').strip()
             description_text = f"\n\n📃 Описание вакансии:\n\n{description}" if description else ""
@@ -129,39 +131,40 @@ async def handle_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     row = data[index]
     vacancy = row['Вакансия']
+    context.user_data['vacancy'] = vacancy  # Сохраняем вакансию на которую откликнулись
+
     await query.answer()
-
-    # Сохраняем вакансию в контексте для дальнейшей обработки
-    context.user_data['vacancy'] = vacancy
-
     await query.message.edit_text(f"Вы откликнулись на вакансию: {vacancy}\n\nПожалуйста, введите ваше ФИО:")
 
-# Обработка текста с ФИО
-async def handle_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    name = update.message.text.strip()
-    if not name.replace(" ", "").replace("-", "").isalpha():
-        await update.message.reply_text("Пожалуйста, введите корректное ФИО (только буквы, пробелы и дефисы).")
+# Обработка ввода ФИО
+async def handle_fio(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    fio = update.message.text.strip()
+
+    if not re.match(r"^[А-Яа-яЁё\s-]+$", fio):
+        await update.message.reply_text("Неверное ФИО. Пожалуйста, введите ФИО только с буквами, пробелами и дефисами.")
         return
 
-    context.user_data['name'] = name
+    context.user_data['fio'] = fio
     await update.message.reply_text("Теперь, пожалуйста, введите ваш номер телефона:")
 
-# Обработка текста с номером телефона
+# Обработка ввода номера телефона
 async def handle_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     phone = update.message.text.strip()
-    if not all(char.isdigit() or char in "+() " for char in phone):
-        await update.message.reply_text("Пожалуйста, введите корректный номер телефона (можно использовать только цифры, +, ( и )).")
+
+    if not re.match(r"^[\d+\(\)\- ]+$", phone):
+        await update.message.reply_text("Неверный номер телефона. Пожалуйста, введите номер с цифрами, пробелами, дефисами и скобками.")
         return
 
     context.user_data['phone'] = phone
-    name = context.user_data.get('name')
-    phone = context.user_data.get('phone')
-    vacancy = context.user_data.get('vacancy')
-    username = update.message.from_user.username or 'без username'
+    username = update.message.from_user.username
 
-    save_application_to_sheet(name, phone, vacancy, username)
-
-    await update.message.reply_text("Спасибо! Мы получили ваш отклик. Скоро с вами свяжутся.")
+    # Сохранение данных в Google Sheets
+    save_application_to_sheet(context.user_data['fio'], context.user_data['phone'], context.user_data['vacancy'], username)
+    
+    await update.message.reply_text(f"Ваш отклик на вакансию {context.user_data['vacancy']} принят!\n"
+                                    f"ФИО: {context.user_data['fio']}\n"
+                                    f"Телефон: {context.user_data['phone']}\n\n"
+                                    "Спасибо за отклик!")
 
 # Запуск бота
 app = ApplicationBuilder().token(os.environ["BOT_TOKEN"]).build()
@@ -173,9 +176,7 @@ app.add_handler(CallbackQueryHandler(handle_callback, pattern="find_jobs"))
 app.add_handler(CallbackQueryHandler(handle_apply, pattern=r"apply_\d+"))
 app.add_handler(CallbackQueryHandler(back, pattern="back"))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
-# Обработчики для сбора данных (ФИО и телефон)
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_name))  # Обрабатывает ФИО
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_phone))  # Обрабатывает телефон
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_fio, block=True))  # Для ФИО
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_phone, block=True))  # Для телефона
 
 app.run_polling()
