@@ -28,6 +28,10 @@ def save_application_to_sheet(name, phone, vacancy, username):
     new_row = [now, name, phone, vacancy, f"@{username}" if username else "без username"]
     worksheet.append_row(new_row, value_input_option="USER_ENTERED")
 
+# Состояния для каждого пользователя
+STATE_WAITING_FOR_FIO = 1
+STATE_WAITING_FOR_PHONE = 2
+
 # Команда /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
@@ -136,8 +140,14 @@ async def handle_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     await query.message.edit_text(f"Вы откликнулись на вакансию: {vacancy}\n\nПожалуйста, введите ваше ФИО:")
 
+    # Меняем состояние пользователя на ожидающий ФИО
+    context.user_data['state'] = STATE_WAITING_FOR_FIO
+
 # Обработка ввода ФИО
 async def handle_fio(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if context.user_data.get('state') != STATE_WAITING_FOR_FIO:
+        return
+
     fio = update.message.text.strip()
 
     if not re.match(r"^[А-Яа-яЁё\s-]+$", fio):
@@ -147,12 +157,18 @@ async def handle_fio(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['fio'] = fio
     await update.message.reply_text("Теперь, пожалуйста, введите ваш номер телефона:")
 
+    # Меняем состояние на ожидание номера телефона
+    context.user_data['state'] = STATE_WAITING_FOR_PHONE
+
 # Обработка ввода номера телефона
 async def handle_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if context.user_data.get('state') != STATE_WAITING_FOR_PHONE:
+        return
+
     phone = update.message.text.strip()
 
     if not re.match(r"^[\d+\(\)\- ]+$", phone):
-        await update.message.reply_text("Неверный номер телефона. Пожалуйста, введите номер с цифрами, пробелами, дефисами и скобками.")
+        await update.message.reply_text("Неверный номер телефона. Пожалуйста, введите номер с цифрами, знаками +, -, (), пробелами.")
         return
 
     context.user_data['phone'] = phone
@@ -166,6 +182,9 @@ async def handle_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                     f"Телефон: {context.user_data['phone']}\n\n"
                                     "Спасибо за отклик!")
 
+    # Завершаем процесс, сбрасываем состояние
+    context.user_data['state'] = None
+
 # Запуск бота
 app = ApplicationBuilder().token(os.environ["BOT_TOKEN"]).build()
 
@@ -176,7 +195,7 @@ app.add_handler(CallbackQueryHandler(handle_callback, pattern="find_jobs"))
 app.add_handler(CallbackQueryHandler(handle_apply, pattern=r"apply_\d+"))
 app.add_handler(CallbackQueryHandler(back, pattern="back"))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_fio, block=True))  # Для ФИО
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_phone, block=True))  # Для телефона
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_fio))  # Для ФИО
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_phone))  # Для телефона
 
 app.run_polling()
