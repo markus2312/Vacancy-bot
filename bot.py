@@ -47,60 +47,7 @@ async def jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await asyncio.sleep(1)
         await update.callback_query.message.reply_text("Какая вакансия интересует?")
 
-# Обработка кнопки
-async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    if query.data == "find_jobs":
-        await jobs(update, context)
-
-# Ответ на текст
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.lower()
-    data = get_data()
-
-    all_titles = [row['Вакансия'] for row in data]
-    matches = []
-
-    for row in data:
-        for line in row['Вакансия'].splitlines():
-            if text in line.lower():
-                matches.append(row)
-                break
-            elif difflib.get_close_matches(text, [line.lower()], cutoff=0.6):
-                matches.append(row)
-                break
-
-    if matches:
-        for row in matches:
-            description = row.get('Описание', '').strip()
-            description_text = f"\n\n📃 Описание вакансии:\n\n{description}" if description else ""
-            response = f"""
-🔧 *{row['Вакансия']}*
-
-📈 Часовая ставка:
-{row['Часовая ставка']}
-
-🕐 Вахта 30/30 по 12ч:
-{row['Вахта по 12 часов (30/30)']}
-
-🕑 Вахта 60/30 по 11ч:
-{row['Вахта по 11 ч (60/30)']}
-
-📌 Статус: {row.get('СТАТУС', 'не указан')}{description_text}
-"""
-
-            keyboard = [
-                [InlineKeyboardButton("ОТКЛИКНУТЬСЯ", callback_data=f"apply_{row['Вакансия']}"),
-                 InlineKeyboardButton("НАЗАД", callback_data="back")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-
-            await update.message.reply_markdown(response, reply_markup=reply_markup)
-    else:
-        await update.message.reply_text("Не нашёл вакансию по вашему запросу. Попробуйте написать её полнее.")
-
-# Обработка команды /back
+# Обработка кнопки "НАЗАД"
 async def back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print("Back button clicked")
 
@@ -116,7 +63,7 @@ async def back(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=reply_markup
     )
 
-# Обработка кнопки отклика
+# Обработка кнопки "ОТКЛИКНУТЬСЯ"
 async def handle_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     vacancy = query.data.split("_", 1)[1]  # Получаем название вакансии из callback_data
@@ -148,13 +95,18 @@ async def handle_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Запуск бота
 app = ApplicationBuilder().token("7868075757:AAER7ENuM0L6WT_W5ZB0iRrVRUw8WeijbOo").build()
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("jobs", jobs))
-app.add_handler(CommandHandler("back", back))
+
+# Сначала добавляем обработчики для кнопок (важно, чтобы обработка кнопок была первой)
 app.add_handler(CallbackQueryHandler(handle_callback))
 app.add_handler(CallbackQueryHandler(handle_apply, pattern="apply_"))
 app.add_handler(CallbackQueryHandler(back, pattern="back"))
+
+# Затем добавляем обработчики команд и текстовых сообщений
+app.add_handler(CommandHandler("start", start))
+app.add_handler(CommandHandler("jobs", jobs))
+app.add_handler(CommandHandler("back", back))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_name))
 
+# Запуск бота
 app.run_polling()
