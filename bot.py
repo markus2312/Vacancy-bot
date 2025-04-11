@@ -9,7 +9,7 @@ import asyncio
 import difflib
 
 # Настройка логирования
-logging.basicConfig(level=logging.DEBUG)  # Логирование на уровне DEBUG
+logging.basicConfig(level=logging.DEBUG)  # Логируем на уровне DEBUG
 logger = logging.getLogger(__name__)
 
 # Подключение к Google Sheets
@@ -24,54 +24,43 @@ def get_data():
 
 # Команда /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        logger.debug("Command /start received")  # Логируем команду /start
-        keyboard = [
-            [InlineKeyboardButton("АКТУАЛЬНЫЕ ВАКАНСИИ", callback_data="find_jobs")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text(
-            "Я помогу вам подобрать вакансию. Напишите название профессии или посмотрите список открытых вакансий",
-            reply_markup=reply_markup
-        )
-    except Exception as e:
-        logger.error(f"Error in start command: {e}")
+    logger.debug("Command /start received")  # Логируем команду /start
+    keyboard = [
+        [InlineKeyboardButton("АКТУАЛЬНЫЕ ВАКАНСИИ", callback_data="find_jobs")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(
+        "Я помогу вам подобрать вакансию. Напишите название профессии или посмотрите список открытых вакансий",
+        reply_markup=reply_markup
+    )
 
 # Команда /jobs и кнопка
 async def jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        logger.debug("Fetching jobs data")  # Логируем начало получения вакансий
-        data = get_data()
-        lines = []
-        for row in data:
-            if row.get('СТАТУС', '').strip().upper() == 'НАБИРАЕМ':
-                for line in row['Вакансия'].splitlines():
-                    lines.append(f"• {line.strip()}")
-        text = "\n".join(lines)
+    logger.debug("Fetching jobs data")  # Логируем начало получения вакансий
+    data = get_data()
+    lines = []
+    for row in data:
+        if row.get('СТАТУС', '').strip().upper() == 'НАБИРАЕМ':
+            for line in row['Вакансия'].splitlines():
+                lines.append(f"• {line.strip()}")
+    text = "\n".join(lines)
 
-        if update.message:
-            await update.message.reply_text("Список актуальных вакансий:\n\n" + text)
-            await asyncio.sleep(1)
-            await update.message.reply_text("Какая вакансия интересует?")
-        elif update.callback_query:
-            await update.callback_query.message.reply_text("Список актуальных вакансий:\n\n" + text)
-            await asyncio.sleep(1)
-            await update.callback_query.message.reply_text("Какая вакансия интересует?")
-    except Exception as e:
-        logger.error(f"Error in jobs command: {e}")
+    if update.message:
+        await update.message.reply_text("Список актуальных вакансий:\n\n" + text)
+        await asyncio.sleep(1)
+        await update.message.reply_text("Какая вакансия интересует?")
+    elif update.callback_query:
+        await update.callback_query.message.reply_text("Список актуальных вакансий:\n\n" + text)
+        await asyncio.sleep(1)
+        await update.callback_query.message.reply_text("Какая вакансия интересует?")
 
 # Обработка кнопки
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        query = update.callback_query
-        logger.debug(f"Callback received with data: {query.data}")  # Логируем данные callback
-        await query.answer()
-
-        if query.data == "find_jobs":
-            await jobs(update, context)
-    except Exception as e:
-        logger.error(f"Error in handle_callback: {e}")
-        await update.callback_query.answer("Произошла ошибка при обработке запроса. Попробуйте снова позже.")
+    query = update.callback_query
+    logger.debug(f"Callback received with data: {query.data}")  # Логируем данные callback
+    await query.answer()
+    if query.data == "find_jobs":
+        await jobs(update, context)
 
 # Ответ на текст
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -87,6 +76,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if text in line.lower():
                     matches.append(row)
                     break
+            # Здесь мы проверяем близкие совпадения
             elif difflib.get_close_matches(text, [line.lower()], cutoff=0.6):
                 matches.append(row)
                 break
@@ -127,36 +117,24 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Обработка команды /back
 async def back(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        logger.debug("Back button clicked")  # Логируем, что кнопка "НАЗАД" была нажата
-        keyboard = [
-            [InlineKeyboardButton("АКТУАЛЬНЫЕ ВАКАНСИИ", callback_data="find_jobs")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        # Ответ на запрос callback_query, чтобы убрать индикатор загрузки
-        await update.callback_query.answer()
-
-        # Отправка нового сообщения или редактирование текущего
-        await update.callback_query.message.edit_text(
-            "Я помогу вам подобрать вакансию. Напишите название профессии или посмотрите список открытых вакансий",
-            reply_markup=reply_markup
-        )
-    except Exception as e:
-        logger.error(f"Error in back button handler: {e}")
-        await update.callback_query.answer("Произошла ошибка при возвращении. Попробуйте снова позже.")
+    logger.debug("Back command received")  # Логируем получение команды /back
+    keyboard = [
+        [InlineKeyboardButton("АКТУАЛЬНЫЕ ВАКАНСИИ", callback_data="find_jobs")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        "Я помогу вам подобрать вакансию. Напишите название профессии или посмотрите список открытых вакансий",
+        reply_markup=reply_markup
+    )
 
 # Обработка кнопки отклика
 async def handle_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        query = update.callback_query
-        vacancy = query.data.split("_", 1)[1]  # Получаем название вакансии
-        logger.debug(f"User applied for vacancy: {vacancy}")  # Логируем отклик на вакансию
-        await query.answer()
-        await query.message.edit_text(f"Вы откликнулись на вакансию: {vacancy}\nВведите ваше ФИО:")
-    except Exception as e:
-        logger.error(f"Error in handle_apply: {e}")
-        await update.callback_query.answer("Произошла ошибка при отклике на вакансию. Попробуйте снова позже.")
+    query = update.callback_query
+    vacancy = query.data.split("_", 1)[1]  # Получаем название вакансии
+    logger.debug(f"User applied for vacancy: {vacancy}")  # Логируем отклик на вакансию
+    await query.answer()
+    await query.message.edit_text(f"Вы откликнулись на вакансию: {vacancy}\nВведите ваше ФИО:")
 
 # Запуск бота
 app = ApplicationBuilder().token("7868075757:AAER7ENuM0L6WT_W5ZB0iRrVRUw8WeijbOo").build()
