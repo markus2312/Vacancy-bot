@@ -114,7 +114,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Обработка команды /back
 async def back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Логируем, что кнопка "НАЗАД" была нажата
-    logger.debug("Back button clicked")
+    print("Back button clicked")
 
     # Клавиатура с кнопкой "АКТУАЛЬНЫЕ ВАКАНСИИ"
     keyboard = [
@@ -125,7 +125,7 @@ async def back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Ответ на запрос callback_query, чтобы убрать индикатор загрузки
     await update.callback_query.answer()
 
-    # Отправка нового сообщения с клавиатурой
+    # Отправка нового сообщения с клавиатурой (снятие старого текста)
     await update.callback_query.message.reply_text(
         "Я помогу вам подобрать вакансию. Напишите название профессии или посмотрите список открытых вакансий",
         reply_markup=reply_markup
