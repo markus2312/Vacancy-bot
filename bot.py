@@ -123,7 +123,7 @@ async def handle_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.message.edit_text(f"Вы откликнулись на вакансию: {vacancy}\n\nПожалуйста, введите ваше ФИО:")
 
 # Запуск бота
-app = ApplicationBuilder().token(os.environ['TELEGRAM_TOKEN']).build()
+app = ApplicationBuilder().token(os.environ['7868075757:AAER7ENuM0L6WT_W5ZB0iRrVRUw8WeijbOo']).build()
 
 # Хендлеры
 app.add_handler(CommandHandler("start", start))
