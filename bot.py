@@ -31,6 +31,7 @@ def save_application_to_sheet(name, phone, vacancy, username):
 # Состояния для каждого пользователя
 STATE_WAITING_FOR_FIO = 1
 STATE_WAITING_FOR_PHONE = 2
+STATE_IDLE = 0
 
 # Команда /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -71,7 +72,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Обработка текстового ввода (поиск вакансий)
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Если мы в процессе ввода ФИО или телефона, то не обрабатываем как поиск вакансий
+    # Если пользователь в процессе ввода ФИО или телефона, не выполняем поиск
     if 'state' in context.user_data and context.user_data['state'] in [STATE_WAITING_FOR_FIO, STATE_WAITING_FOR_PHONE]:
         return
 
@@ -187,7 +188,7 @@ async def handle_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                     "Спасибо за отклик!")
 
     # Завершаем процесс, сбрасываем состояние
-    context.user_data['state'] = None
+    context.user_data['state'] = STATE_IDLE
 
 # Запуск бота
 app = ApplicationBuilder().token(os.environ["BOT_TOKEN"]).build()
