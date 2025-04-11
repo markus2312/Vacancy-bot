@@ -116,7 +116,14 @@ async def back_to_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     # Повторно отправляем начальное сообщение с кнопкой
-    await start(update, context)
+    keyboard = [
+        [InlineKeyboardButton("АКТУАЛЬНЫЕ ВАКАНСИИ", callback_data="find_jobs")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.message.edit_text(
+        "Я помогу вам подобрать вакансию. Напишите название профессии или посмотрите список открытых вакансий",
+        reply_markup=reply_markup
+    )
 
 # Запуск бота
 app = ApplicationBuilder().token("7868075757:AAER7ENuM0L6WT_W5ZB0iRrVRUw8WeijbOo").build()
