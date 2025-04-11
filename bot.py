@@ -21,6 +21,7 @@ def get_data():
 # Состояния для пользователя
 STATE_WAITING_FOR_FIO = 1
 STATE_WAITING_FOR_PHONE = 2
+STATE_WAITING_FOR_VACANCY = 3
 STATE_IDLE = 0
 
 # Этапы для ConversationHandler
@@ -63,99 +64,83 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Обработка текстового ввода
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.lower()
-    data = get_data()
-    matches = []
+    # Если бот ожидает вакансии, ищем вакансию
+    if 'waiting_for_vacancy' in context.user_data and context.user_data['waiting_for_vacancy']:
+        text = update.message.text.lower()
+        data = get_data()
+        matches = []
 
-    for row in data:
-        for line in row['Вакансия'].splitlines():
-            if text in line.lower() or difflib.get_close_matches(text, [line.lower()], cutoff=0.6):
-                matches.append(row)
-                break
+        for row in data:
+            for line in row['Вакансия'].splitlines():
+                if text in line.lower() or difflib.get_close_matches(text, [line.lower()], cutoff=0.6):
+                    matches.append(row)
+                    break
 
-    if matches:
-        for i, row in enumerate(matches):
-            description = row.get('Описание', '').strip()
-            description_text = f"\n\n📃 Описание вакансии:\n\n{description}" if description else ""
+        if matches:
+            for i, row in enumerate(matches):
+                description = row.get('Описание', '').strip()
+                description_text = f"\n\n📃 Описание вакансии:\n\n{description}" if description else ""
 
-            response = f"""
-🔧 *{row['Вакансия']}*
+                response = f"""
+    🔧 *{row['Вакансия']}*
 
-📈 Часовая ставка:
-{row['Часовая ставка']}
+    📈 Часовая ставка:
+    {row['Часовая ставка']}
 
-🕐 Вахта 30/30 по 12ч:
-{row['Вахта по 12 часов (30/30)']}
+    🕐 Вахта 30/30 по 12ч:
+    {row['Вахта по 12 часов (30/30)']}
 
-🕑 Вахта 60/30 по 11ч:
-{row['Вахта по 11 ч (60/30)']}
+    🕑 Вахта 60/30 по 11ч:
+    {row['Вахта по 11 ч (60/30)']}
 
-📌 Статус: {row.get('СТАТУС', 'не указан')}{description_text}
-"""
+    📌 Статус: {row.get('СТАТУС', 'не указан')}{description_text}
+    """
 
-            keyboard = [
-                [InlineKeyboardButton("ОТКЛИКНУТЬСЯ", callback_data=f"apply_{i}")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            await update.message.reply_markdown(response, reply_markup=reply_markup)
-    else:
-        await update.message.reply_text("Не нашёл вакансию по вашему запросу. Попробуйте написать её полнее.")
-
-# Обработка кнопки "ОТКЛИКНУТЬСЯ"
-async def handle_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    index = int(query.data.split("_", 1)[1])
-    data = get_data()
-
-    if index >= len(data):
-        await query.answer("Не удалось найти вакансию. Попробуйте откликнуться заново.")
+                keyboard = [
+                    [InlineKeyboardButton("ОТКЛИКНУТЬСЯ", callback_data=f"apply_{i}")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await update.message.reply_markdown(response, reply_markup=reply_markup)
+        else:
+            await update.message.reply_text("Не нашёл вакансию по вашему запросу. Попробуйте написать её полнее.")
         return
 
-    row = data[index]
-    vacancy = row['Вакансия']
-    context.user_data['vacancy'] = vacancy  # Сохраняем вакансию на которую откликнулись
+    # Если бот ожидает ввод ФИО или телефона, то не выполняем поиск вакансий
+    # Обработка ввода ФИО
+    if 'waiting_for_fio' in context.user_data and context.user_data['waiting_for_fio']:
+        fio = update.message.text.strip()
 
-    await query.message.edit_text(f"Вы откликнулись на вакансию: {vacancy}\n\nПожалуйста, введите ваше ФИО:")
+        if not re.match(r"^[А-Яа-яЁё\s-]+$", fio):
+            await update.message.reply_text("Неверное ФИО. Пожалуйста, введите ФИО только с буквами, пробелами и дефисами.")
+            return FIO
 
-    # Меняем состояние пользователя на ожидающий ФИО
-    return FIO
+        context.user_data['fio'] = fio
+        await update.message.reply_text("Теперь, пожалуйста, введите ваш номер телефона:")
 
-# Обработка ввода ФИО
-async def handle_fio(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    fio = update.message.text.strip()
-
-    if not re.match(r"^[А-Яа-яЁё\s-]+$", fio):
-        await update.message.reply_text("Неверное ФИО. Пожалуйста, введите ФИО только с буквами, пробелами и дефисами.")
-        return FIO
-
-    context.user_data['fio'] = fio
-    await update.message.reply_text("Теперь, пожалуйста, введите ваш номер телефона:")
-
-    # Переходим к следующему шагу
-    return PHONE
-
-# Обработка ввода номера телефона
-async def handle_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    phone = update.message.text.strip()
-
-    if not re.match(r"^[\d+\(\)\- ]+$", phone):
-        await update.message.reply_text("Неверный номер телефона. Пожалуйста, введите номер с цифрами, знаками +, -, (), пробелами.")
+        # Переходим к следующему шагу
         return PHONE
 
-    context.user_data['phone'] = phone
-    username = update.message.from_user.username
+    # Обработка ввода телефона
+    if 'waiting_for_phone' in context.user_data and context.user_data['waiting_for_phone']:
+        phone = update.message.text.strip()
 
-    # Сохранение данных в Google Sheets
-    save_application_to_sheet(context.user_data['fio'], context.user_data['phone'], context.user_data['vacancy'], username)
-    
-    await update.message.reply_text(f"Ваш отклик на вакансию {context.user_data['vacancy']} принят!\n"
-                                    f"ФИО: {context.user_data['fio']}\n"
-                                    f"Телефон: {context.user_data['phone']}\n\n"
-                                    "Спасибо за отклик!")
+        if not re.match(r"^[\d+\(\)\- ]+$", phone):
+            await update.message.reply_text("Неверный номер телефона. Пожалуйста, введите номер с цифрами, знаками +, -, (), пробелами.")
+            return PHONE
 
-    # Завершаем процесс
-    return ConversationHandler.END
+        context.user_data['phone'] = phone
+        username = update.message.from_user.username
+
+        # Сохранение данных в Google Sheets
+        save_application_to_sheet(context.user_data['fio'], context.user_data['phone'], context.user_data['vacancy'], username)
+
+        await update.message.reply_text(f"Ваш отклик на вакансию {context.user_data['vacancy']} принят!\n"
+                                        f"ФИО: {context.user_data['fio']}\n"
+                                        f"Телефон: {context.user_data['phone']}\n\n"
+                                        "Спасибо за отклик!")
+
+        # Завершаем процесс
+        return ConversationHandler.END
 
 # Сохранение данных в Google Sheets
 def save_application_to_sheet(name, phone, vacancy, username):
