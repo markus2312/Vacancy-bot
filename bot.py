@@ -38,7 +38,6 @@ async def jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 lines.append(f"• {line.strip()}")
     text = "\n".join(lines)
 
-    # Определим, откуда пришёл запрос (команда или кнопка)
     if update.message:
         await update.message.reply_text("Список актуальных вакансий:\n\n" + text)
         await asyncio.sleep(1)
@@ -74,16 +73,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if matches:
         for row in matches:
-            # Получаем описание из столбца F, который называется "Описание"
             description = row.get('Описание', '').strip()
-
-            # Логируем описание для отладки
-            print(f"Описание вакансии для '{row['Вакансия']}': {description}")
-
-            # Если описание не пустое, добавляем его к ответу с пустыми строками
             description_text = f"\n\n📃 Описание вакансии:\n\n{description}" if description else ""
-
-            # Формируем ответ
             response = f"""
 🔧 *{row['Вакансия']}*
 
@@ -99,33 +90,27 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 📌 Статус: {row.get('СТАТУС', 'не указан')}{description_text}
 """
 
-            # Добавляем кнопки "ОТКЛИКНУТЬСЯ" и "НАЗАД"
             keyboard = [
                 [InlineKeyboardButton("ОТКЛИКНУТЬСЯ", callback_data=f"apply_{row['Вакансия']}"),
                  InlineKeyboardButton("НАЗАД", callback_data="back")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
-            # Отправляем сообщение с вакансиями и кнопками
             await update.message.reply_markdown(response, reply_markup=reply_markup)
     else:
         await update.message.reply_text("Не нашёл вакансию по вашему запросу. Попробуйте написать её полнее.")
 
-# Обработка кнопки "НАЗАД"
+# Обработка команды /back
 async def back(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Логируем, что кнопка "НАЗАД" была нажата
     print("Back button clicked")
 
-    # Клавиатура с кнопкой "АКТУАЛЬНЫЕ ВАКАНСИИ"
     keyboard = [
         [InlineKeyboardButton("АКТУАЛЬНЫЕ ВАКАНСИИ", callback_data="find_jobs")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # Ответ на запрос callback_query, чтобы убрать индикатор загрузки
     await update.callback_query.answer()
 
-    # Отправка нового сообщения с клавиатурой
     await update.callback_query.message.reply_text(
         "Я помогу вам подобрать вакансию. Напишите название профессии или посмотрите список открытых вакансий",
         reply_markup=reply_markup
@@ -136,15 +121,40 @@ async def handle_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     vacancy = query.data.split("_", 1)[1]  # Получаем название вакансии из callback_data
     await query.answer()
+
+    # Запрос имени и фамилии у соискателя
     await query.message.edit_text(f"Вы откликнулись на вакансию: {vacancy}\nВведите ваше ФИО:")
 
+    # Сохраняем вакансию для использования в дальнейшем (например, при записи данных в Google Sheets)
+    context.user_data['vacancy'] = vacancy
+
+# Обработка введенного имени и фамилии
+async def handle_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_name = update.message.text.strip()
+
+    # Проверка, что пользователь уже откликнулся на вакансию
+    if 'vacancy' in context.user_data:
+        vacancy = context.user_data['vacancy']
+        await update.message.reply_text(f"Спасибо! Вы откликнулись на вакансию: {vacancy}. Ваши данные: {user_name}.")
+
+        # Здесь можно обработать данные (например, сохранить в Google Sheets)
+        # Например, сохраняем данные в контекст или базу данных
+        # Если хотите, можете сохранить имя и вакансию в Google Sheets или другой источник.
+
+        # Очистка данных после обработки
+        del context.user_data['vacancy']
+    else:
+        await update.message.reply_text("Не удалось найти вакансию. Попробуйте откликнуться заново.")
+
 # Запуск бота
-app = ApplicationBuilder().token("7868075757:AAER7ENuM0L6WT_W5ZB0iRrVRUw8WeijbOo").build()
+app = ApplicationBuilder().token("YOUR_BOT_TOKEN").build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("jobs", jobs))
+app.add_handler(CommandHandler("back", back))
 app.add_handler(CallbackQueryHandler(handle_callback))
 app.add_handler(CallbackQueryHandler(handle_apply, pattern="apply_"))
-app.add_handler(CallbackQueryHandler(back, pattern="back"))  # Обработка кнопки "НАЗАД"
+app.add_handler(CallbackQueryHandler(back, pattern="back"))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_name))
 
 app.run_polling()
