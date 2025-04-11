@@ -132,7 +132,7 @@ async def handle_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.message.edit_text(f"Вы откликнулись на вакансию: {vacancy}\nВведите ваше ФИО:")
 
 # Запуск бота
-app = ApplicationBuilder().token("YOUR_TOKEN").build()
+app = ApplicationBuilder().token("7868075757:AAER7ENuM0L6WT_W5ZB0iRrVRUw8WeijbOo").build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("jobs", jobs))
 app.add_handler(CommandHandler("back", back))
