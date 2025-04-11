@@ -2,11 +2,11 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import json
+import os
 
 # Подключение к Google Sheets
 scope = ["https://spreadsheets.google.com/feeds",'https://www.googleapis.com/auth/drive']
-import json
-import os
 
 creds_dict = json.loads(os.environ['GOOGLE_CREDENTIALS'])
 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
@@ -24,12 +24,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Команда /jobs
 async def jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = get_data()
-lines = []
-for row in data:
-    if row.get('СТАТУС', '').strip().upper() == 'НАБИРАЕМ':
-        for line in row['Вакансия'].splitlines():
-            lines.append(f"• {line.strip()}")
-text = "\n".join(lines)
+    
+    lines = []  # Здесь создаем пустой список для вакансий
+    for row in data:
+        if row.get('СТАТУС', '').strip().upper() == 'НАБИРАЕМ':  # Проверяем статус вакансии
+            for line in row['Вакансия'].splitlines():  # Разбиваем по строкам
+                lines.append(f"• {line.strip()}")  # Добавляем каждую строку с маркером
+    text = "\n".join(lines)  # Объединяем все вакансии в одну строку
 
     await update.message.reply_text("Список актуальных вакансий:\n" + text)
 
