@@ -24,7 +24,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Команда /jobs
 async def jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = get_data()
-    text = "\n".join([f"• {row['Вакансия']}" for row in data if row.get('СТАТУС', '').strip().upper() == 'НАБИРАЕМ'])
+lines = []
+for row in data:
+    if row.get('СТАТУС', '').strip().upper() == 'НАБИРАЕМ':
+        for line in row['Вакансия'].splitlines():
+            lines.append(f"• {line.strip()}")
+text = "\n".join(lines)
+
     await update.message.reply_text("Список актуальных вакансий:\n" + text)
 
 # Ответ на сообщения
