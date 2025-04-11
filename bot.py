@@ -110,18 +110,35 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("Не нашёл вакансию по вашему запросу. Попробуйте написать её полнее.")
 
-# Обработка команды /back
-async def back(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    logger.debug("Back command received")  # Логируем получение команды /back
-    keyboard = [
-        [InlineKeyboardButton("АКТУАЛЬНЫЕ ВАКАНСИИ", callback_data="find_jobs")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+# Обработка кнопки "НАЗАД"
+async def back_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Логируем, что кнопка "НАЗАД" была нажата
+    logger.debug(f"Back button clicked. Callback data: {update.callback_query.data}")
     
-    await update.message.reply_text(
-        "Я помогу вам подобрать вакансию. Напишите название профессии или посмотрите список открытых вакансий",
-        reply_markup=reply_markup
-    )
+    # Ответ на запрос callback_query, чтобы убрать индикатор загрузки
+    await update.callback_query.answer()
+    
+    # Проверим, действительно ли callback_data содержит "back"
+    if update.callback_query.data == "back":
+        logger.debug("Callback data is 'back', proceeding with message edit.")
+
+        # Клавиатура с кнопкой "АКТУАЛЬНЫЕ ВАКАНСИИ"
+        keyboard = [
+            [InlineKeyboardButton("АКТУАЛЬНЫЕ ВАКАНСИИ", callback_data="find_jobs")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        # Редактируем текст текущего сообщения
+        try:
+            await update.callback_query.message.edit_text(
+                "Я помогу вам подобрать вакансию. Напишите название профессии или посмотрите список открытых вакансий",
+                reply_markup=reply_markup
+            )
+            logger.debug("Message edited successfully.")
+        except Exception as e:
+            logger.error(f"Failed to edit message: {e}")
+    else:
+        logger.debug("Callback data is not 'back', skipping message edit.")
 
 # Обработка кнопки отклика
 async def handle_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -131,31 +148,11 @@ async def handle_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     await query.message.edit_text(f"Вы откликнулись на вакансию: {vacancy}\nВведите ваше ФИО:")
 
-# Обработка кнопки "НАЗАД"
-async def back_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Логируем, что кнопка "НАЗАД" была нажата
-    logger.debug("Back button clicked")
-    
-    # Клавиатура с кнопкой "АКТУАЛЬНЫЕ ВАКАНСИИ"
-    keyboard = [
-        [InlineKeyboardButton("АКТУАЛЬНЫЕ ВАКАНСИИ", callback_data="find_jobs")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    # Ответ на запрос callback_query, чтобы убрать индикатор загрузки
-    await update.callback_query.answer()
-
-    # Отправка нового сообщения или редактирование текущего
-    await update.callback_query.message.edit_text(
-        "Я помогу вам подобрать вакансию. Напишите название профессии или посмотрите список открытых вакансий",
-        reply_markup=reply_markup
-    )
-
 # Запуск бота
 app = ApplicationBuilder().token("7868075757:AAER7ENuM0L6WT_W5ZB0iRrVRUw8WeijbOo").build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("jobs", jobs))
-app.add_handler(CommandHandler("back", back))
+app.add_handler(CommandHandler("back", back_button))
 app.add_handler(CallbackQueryHandler(handle_callback))
 app.add_handler(CallbackQueryHandler(handle_apply, pattern="apply_"))
 app.add_handler(CallbackQueryHandler(back_button, pattern="back"))  # Обработка кнопки "НАЗАД"
