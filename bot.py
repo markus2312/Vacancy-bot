@@ -125,6 +125,7 @@ async def handle_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Сохраняем вакансию для дальнейшего использования
     context.user_data['vacancy_name'] = vacancy_name
     # Переходим к сбору имени
+    await query.edit_message_text("Пожалуйста, введите ваше ФИО.")
     return GET_NAME
 
 # Получение имени и фамилии
@@ -178,7 +179,7 @@ conversation_handler = ConversationHandler(
         GET_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_name)],
         GET_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_phone)],
     },
-    fallbacks=[],
+    fallbacks=[CallbackQueryHandler(handle_back_to_jobs, pattern="back_to_jobs")],
 )
 
 # Запуск бота
@@ -187,8 +188,5 @@ app = ApplicationBuilder().token("7868075757:AAER7ENuM0L6WT_W5ZB0iRrVRUw8WeijbOo
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("jobs", jobs))
 app.add_handler(CallbackQueryHandler(handle_callback))
-app.add_handler(CallbackQueryHandler(handle_back_to_jobs, pattern="back_to_jobs"))
 app.add_handler(conversation_handler)  # Добавляем ConversationHandler
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
 app.run_polling()
