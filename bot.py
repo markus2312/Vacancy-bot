@@ -97,7 +97,7 @@ async def handle_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
 app = ApplicationBuilder().token("7868075757:AAER7ENuM0L6WT_W5ZB0iRrVRUw8WeijbOo").build()
 
 # Сначала добавляем обработчики для кнопки "АКТУАЛЬНЫЕ ВАКАНСИИ" (важно, чтобы он был первым)
-app.add_handler(CallbackQueryHandler(handle_callback, pattern="find_jobs"))
+app.add_handler(CallbackQueryHandler(jobs, pattern="find_jobs"))
 
 # Затем добавляем обработчики для кнопки "ОТКЛИКНУТЬСЯ" и "НАЗАД"
 app.add_handler(CallbackQueryHandler(handle_apply, pattern="apply_"))
