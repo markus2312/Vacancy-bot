@@ -100,11 +100,11 @@ app = ApplicationBuilder().token("7868075757:AAER7ENuM0L6WT_W5ZB0iRrVRUw8WeijbOo
 app.add_handler(CallbackQueryHandler(handle_apply, pattern="apply_"))
 app.add_handler(CallbackQueryHandler(back, pattern="back"))
 
-# Затем добавляем обработчики команд и текстовых сообщений
+# Затем добавляем обработчики команд
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("jobs", jobs))
-app.add_handler(CommandHandler("back", back))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+# Обработчик текстовых сообщений для получения ФИО
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_name))
 
 # Запуск бота
