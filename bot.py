@@ -113,13 +113,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Обработка команды /back
 async def back(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Логируем, что кнопка "НАЗАД" была нажата
+    logger.debug("Back button clicked")
+
+    # Клавиатура с кнопкой "АКТУАЛЬНЫЕ ВАКАНСИИ"
     keyboard = [
         [InlineKeyboardButton("АКТУАЛЬНЫЕ ВАКАНСИИ", callback_data="find_jobs")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    # Отправляем сообщение с кнопкой "АКТУАЛЬНЫЕ ВАКАНСИИ"
-    await update.message.reply_text(
+
+    # Ответ на запрос callback_query, чтобы убрать индикатор загрузки
+    await update.callback_query.answer()
+
+    # Отправка нового сообщения с клавиатурой
+    await update.callback_query.message.reply_text(
         "Я помогу вам подобрать вакансию. Напишите название профессии или посмотрите список открытых вакансий",
         reply_markup=reply_markup
     )
