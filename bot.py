@@ -1,4 +1,4 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
@@ -98,14 +98,30 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 📌 Статус: {row.get('СТАТУС', 'не указан')}{description_text}
 """
-            await update.message.reply_markdown(response)
+            
+            # Создаем кнопки
+            keyboard = [
+                [InlineKeyboardButton("ОТКЛИКНУТЬСЯ", callback_data=f"apply_{row['Вакансия']}"),
+                 InlineKeyboardButton("НАЗАД", callback_data="back_to_jobs")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            # Отправляем сообщение с вакансиями и кнопками
+            await update.message.reply_markdown(response, reply_markup=reply_markup)
     else:
         await update.message.reply_text("Не нашёл вакансию по вашему запросу. Попробуйте написать её полнее.")
+
+# Обработчик кнопки "НАЗАД"
+async def back_to_jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await jobs(update, context)
 
 # Запуск бота
 app = ApplicationBuilder().token("7868075757:AAER7ENuM0L6WT_W5ZB0iRrVRUw8WeijbOo").build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("jobs", jobs))
 app.add_handler(CallbackQueryHandler(handle_callback))
+app.add_handler(CallbackQueryHandler(back_to_jobs, pattern="back_to_jobs"))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 app.run_polling()
