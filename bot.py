@@ -100,7 +100,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Пожалуйста, используйте кнопки для взаимодействия.")
 
 # Запуск бота
-app = ApplicationBuilder().token("YOUR_BOT_API_KEY").build()
+app = ApplicationBuilder().token("7868075757:AAER7ENuM0L6WT_W5ZB0iRrVRUw8WeijbOo").build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CallbackQueryHandler(handle_callback))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
