@@ -71,6 +71,15 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Отменено. Вы можете начать откликнуться снова, выбрав вакансию.")
     return ConversationHandler.END
 
+# Обработка кнопки "АКТУАЛЬНЫЕ ВАКАНСИИ"
+async def find_jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    # Здесь можно подставить логику для актуальных вакансий
+    # Заглушка для вакансий
+    text = "Список актуальных вакансий:\n1. Вакансия 1\n2. Вакансия 2"
+    await query.edit_message_text(text)
+
 # ConversationHandler
 conv_handler = ConversationHandler(
     entry_points=[CallbackQueryHandler(apply, pattern="apply_")],
@@ -87,6 +96,7 @@ app = ApplicationBuilder().token(BOT_TOKEN).build()
 # Добавляем обработчики
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("jobs", jobs))
+app.add_handler(CallbackQueryHandler(find_jobs, pattern="find_jobs"))
 app.add_handler(conv_handler)
 
 # Запускаем бота
