@@ -117,7 +117,7 @@ async def back_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Ответ на запрос callback_query, чтобы убрать индикатор загрузки
     await update.callback_query.answer()
-    
+
     # Проверим, действительно ли callback_data содержит "back"
     if update.callback_query.data == "back":
         logger.debug("Callback data is 'back', proceeding with message edit.")
