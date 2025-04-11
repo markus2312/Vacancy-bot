@@ -25,7 +25,7 @@ STATE_WAITING_FOR_VACANCY = 3
 STATE_IDLE = 0
 
 # Этапы для ConversationHandler
-FIO, PHONE = range(1, 3)
+FIO, PHONE, VACANCY = range(1, 4)
 
 # Команда /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -61,6 +61,23 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     if query.data == "find_jobs":
         await jobs(update, context)
+
+# Обработка кнопки "ОТКЛИКНУТЬСЯ"
+async def handle_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    # Сохраняем информацию о вакансии
+    vacancy_index = int(query.data.split('_')[1])
+    data = get_data()
+    vacancy = data[vacancy_index]['Вакансия']
+    context.user_data['vacancy'] = vacancy
+
+    # Начинаем процесс сбора данных
+    await query.message.reply_text(f"Вы откликаетесь на вакансию: {vacancy}\nВведите ваше ФИО:")
+
+    # Переходим к следующему шагу (ожидание ФИО)
+    return FIO
 
 # Обработка текстового ввода
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -105,7 +122,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("Не нашёл вакансию по вашему запросу. Попробуйте написать её полнее.")
         return
 
-    # Если бот ожидает ввод ФИО или телефона, то не выполняем поиск вакансий
     # Обработка ввода ФИО
     if 'waiting_for_fio' in context.user_data and context.user_data['waiting_for_fio']:
         fio = update.message.text.strip()
@@ -155,8 +171,8 @@ def save_application_to_sheet(name, phone, vacancy, username):
 conversation_handler = ConversationHandler(
     entry_points=[CallbackQueryHandler(handle_apply, pattern=r"apply_\d+")],
     states={
-        FIO: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_fio)],
-        PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_phone)],
+        FIO: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)],
+        PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)],
     },
     fallbacks=[]
 )
