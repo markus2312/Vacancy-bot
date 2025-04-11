@@ -111,7 +111,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("Не нашёл вакансию по вашему запросу. Попробуйте написать её полнее.")
 
-# Обработка команды /back
+# Обработка кнопки "НАЗАД"
 async def back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Логируем, что кнопка "НАЗАД" была нажата
     print("Back button clicked")
@@ -125,7 +125,7 @@ async def back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Ответ на запрос callback_query, чтобы убрать индикатор загрузки
     await update.callback_query.answer()
 
-    # Отправка нового сообщения с клавиатурой (снятие старого текста)
+    # Отправка нового сообщения с клавиатурой
     await update.callback_query.message.reply_text(
         "Я помогу вам подобрать вакансию. Напишите название профессии или посмотрите список открытых вакансий",
         reply_markup=reply_markup
@@ -142,7 +142,6 @@ async def handle_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 app = ApplicationBuilder().token("7868075757:AAER7ENuM0L6WT_W5ZB0iRrVRUw8WeijbOo").build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("jobs", jobs))
-app.add_handler(CommandHandler("back", back))  # Добавляем команду /back
 app.add_handler(CallbackQueryHandler(handle_callback))
 app.add_handler(CallbackQueryHandler(handle_apply, pattern="apply_"))
 app.add_handler(CallbackQueryHandler(back, pattern="back"))  # Обработка кнопки "НАЗАД"
