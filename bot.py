@@ -1,13 +1,14 @@
-from flask import Flask
-from threading import Thread
-import logging
-import asyncio
 import os
 import json
-import gspread
+import asyncio
 import re
 import difflib
+import logging
 from datetime import datetime
+from flask import Flask
+from threading import Thread
+
+import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -16,17 +17,17 @@ from telegram.ext import (
     CallbackQueryHandler, ContextTypes, filters
 )
 
-# ======= Flask Server for Railway Keep Alive ========
+# ========== Flask Keep Alive ==========
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return 'Bot is running!'
+    return 'Bot is alive!'
 
 def run_flask():
     app.run(host='0.0.0.0', port=8080)
 
-# ========= Google Sheets Setup =========
+# ========== Google Sheets ==========
 scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/drive']
 creds_dict = json.loads(os.environ['GOOGLE_CREDENTIALS'])
 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
@@ -40,13 +41,13 @@ def save_application_to_sheet(name, phone, vacancy, username):
     sheet = client.open_by_key("10TcAZPunK079FBN1gNQIU4XmInMEQ8Qz4CWeA6oDGvI")
     worksheet = sheet.worksheet("bot otkliki")
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    new_row = [now, name, phone, vacancy, f"@{username}" if username else "без username"]
-    worksheet.append_row(new_row, value_input_option="USER_ENTERED")
+    worksheet.append_row([now, name, phone, vacancy, f"@{username}" if username else "без username"])
 
-# ========= Bot Handlers =========
+# ========== Bot States ==========
 STATE_WAITING_FOR_FIO = 1
 STATE_WAITING_FOR_PHONE = 2
 
+# ========== Handlers ==========
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("АКТУАЛЬНЫЕ ВАКАНСИИ", callback_data="find_jobs")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -148,7 +149,7 @@ async def handle_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_fio(update: Update, context: ContextTypes.DEFAULT_TYPE):
     fio = update.message.text.strip()
     if not re.match(r"^[А-Яа-яЁё\s-]+$", fio):
-        await update.message.reply_text("Неверное ФИО. Пожалуйста, введите ФИО только с буквами, пробелами и дефисами.")
+        await update.message.reply_text("Неверное ФИО. Пожалуйста, используйте только буквы, пробелы и дефисы.")
         return
     context.user_data['fio'] = fio
     context.user_data['state'] = STATE_WAITING_FOR_PHONE
@@ -157,16 +158,24 @@ async def handle_fio(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     phone = update.message.text.strip()
     if not re.match(r"^[\d+\(\)\- ]+$", phone):
-        await update.message.reply_text("Неверный номер телефона. Пожалуйста, введите номер с цифрами, знаками +, -, (), пробелами.")
+        await update.message.reply_text("Неверный номер телефона. Разрешены цифры, +, -, (), пробелы.")
         return
+
     context.user_data['phone'] = phone
     username = update.message.from_user.username
-    save_application_to_sheet(context.user_data['fio'], phone, context.user_data['vacancy'], username)
 
-    await update.message.reply_text(
-        f"Ваш отклик на вакансию {context.user_data['vacancy']} принят!\n"
-        f"ФИО: {context.user_data['fio']}\nТелефон: {phone}\n\nСпасибо за отклик!"
+    save_application_to_sheet(
+        context.user_data['fio'],
+        context.user_data['phone'],
+        context.user_data['vacancy'],
+        username
     )
+
+    await update.message.reply_text(f"Ваш отклик на вакансию {context.user_data['vacancy']} принят!\n"
+                                    f"ФИО: {context.user_data['fio']}\n"
+                                    f"Телефон: {context.user_data['phone']}\n\n"
+                                    "Спасибо за отклик!")
+
     context.user_data['state'] = None
 
 async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -178,9 +187,16 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     else:
         await handle_message(update, context)
 
-# ========= Bot Launch in Thread =========
-def run_bot():
-    asyncio.set_event_loop(asyncio.new_event_loop())
+# ========== Main ==========
+if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
+
+    # Запускаем Flask-сервер для keep-alive
+    flask_thread = Thread(target=run_flask)
+    flask_thread.daemon = True
+    flask_thread.start()
+
+    # Запускаем Telegram-бот
     application = ApplicationBuilder().token(os.environ["BOT_TOKEN"]).build()
 
     application.add_handler(CommandHandler("start", start))
@@ -191,9 +207,3 @@ def run_bot():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_message))
 
     application.run_polling()
-
-# ========== Start Bot & Flask Server ==========
-if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
-    Thread(target=run_bot).start()
-    run_flask()
