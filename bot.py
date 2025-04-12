@@ -35,9 +35,7 @@ STATE_WAITING_FOR_PHONE = 2
 
 # /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        [InlineKeyboardButton("АКТУАЛЬНЫЕ ВАКАНСИИ", callback_data="find_jobs")]
-    ]
+    keyboard = [[InlineKeyboardButton("АКТУАЛЬНЫЕ ВАКАНСИИ", callback_data="find_jobs")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
         "Я помогу вам подобрать вакансию. Напишите название профессии или посмотрите список открытых вакансий",
@@ -83,7 +81,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 break
 
     if matches:
-        context.user_data['vacancies'] = matches
+        context.user_data['vacancy_matches'] = matches
         for i, row in enumerate(matches):
             description = row.get('Описание', '').strip()
             description_text = f"\n\n📃 Описание вакансии:\n\n{description}" if description else ""
@@ -114,9 +112,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Кнопка НАЗАД
 async def back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.callback_query.answer()
-    keyboard = [
-        [InlineKeyboardButton("АКТУАЛЬНЫЕ ВАКАНСИИ", callback_data="find_jobs")]
-    ]
+    keyboard = [[InlineKeyboardButton("АКТУАЛЬНЫЕ ВАКАНСИИ", callback_data="find_jobs")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.callback_query.message.reply_text(
         "Я помогу вам подобрать вакансию. Напишите название профессии или посмотрите список открытых вакансий",
@@ -127,9 +123,9 @@ async def back(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     index = int(query.data.split("_", 1)[1])
-    data = context.user_data.get('vacancies') or get_data()
-
-    if index >= len(data):
+    
+    data = context.user_data.get('vacancy_matches')
+    if not data or index >= len(data):
         await query.answer("Не удалось найти вакансию. Попробуйте откликнуться заново.")
         return
 
