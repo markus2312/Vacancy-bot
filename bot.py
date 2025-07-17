@@ -46,7 +46,7 @@ STATE_WAITING_FOR_PHONE = 2
 
 # ===== Handlers =====
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [[InlineKeyboardButton("АКТУАЛЬНЫЕ ВАКАНСИИ", callback_data="find_jobs")]]
+    keyboard = [[InlineKeyboardButton("ПОДОБРАТЬ ВАКАНСИЮ", callback_data="find_jobs")]]
     markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("Я помогу вам подобрать вакансию. Напишите название профессии или посмотрите список открытых вакансий", reply_markup=markup)
 
@@ -116,7 +116,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.callback_query.answer()
-    keyboard = [[InlineKeyboardButton("АКТУАЛЬНЫЕ ВАКАНСИИ", callback_data="find_jobs")]]
+    keyboard = [[InlineKeyboardButton("ПОДОБРАТЬ ВАКАНСИЮ", callback_data="find_jobs")]]
     markup = InlineKeyboardMarkup(keyboard)
     await update.callback_query.message.reply_text(
         "Я помогу вам подобрать вакансию. Напишите название профессии или посмотрите список открытых вакансий",
